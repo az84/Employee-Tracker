@@ -66,8 +66,8 @@ function displayPrompts () {
             updateEmployeeManager();
         }
 
-        if (choices === 'View All Roles') {
-            viewAllRoles();
+        if (choices === 'Find All Roles') {
+            findAllRoles();
         }
 
         if (choices === 'Add Role') {
@@ -134,6 +134,7 @@ function findEmployeesByManager() {
   
     db.query(managerEmpl, function (err, res) {
       if (err) throw err;
+      console.table(res)
 
       const managerChoices = res
         .map(({ manager_id, manager }) => ({
@@ -141,8 +142,7 @@ function findEmployeesByManager() {
           name: manager,
         }));
   
-      inquirer
-        .prompt(prompt.viewManagerPrompt(managerChoices))
+      inquirer.prompt(prompt.viewManagerPrompt(managerChoices))
         .then(function (answer) {
           const empMan = `SELECT e.id, e.first_name, e.last_name, r.title, CONCAT(m.first_name, ' ', m.last_name) AS manager
         FROM employee e
@@ -176,6 +176,7 @@ function removeEmployee ()  {
     const employees = data.map(({ id, first_name, last_name }) => ({ name: first_name + " "+ last_name, value: id }));
 
     inquirer.prompt([
+
       {
         input: 'choices',
         name: 'name',
@@ -252,7 +253,7 @@ function updateEmployeeRole ()  {
                   if (err) throw err;
                 console.table(result);
               
-                displayPropmts();
+                displayPrompts();
           });
         });
       });
@@ -262,11 +263,11 @@ function updateEmployeeRole ()  {
 
 
 // All Roles
-function viewAllRoles() {
+function findAllRoles() {
   const findAllRoles =
   "SELECT role.id, role.title, department.name AS department, role.salary FROM role LEFT JOIN department on role.department_id = department.id;"
  ;
-     connection.promise().query(findAllRoles, (err, response) => {
+     db.query(findAllRoles, (err, response) => {
       if (err) throw err;
       console.table (response);
     })
@@ -277,7 +278,7 @@ function viewAllRoles() {
 function addRole() {
   const createRole = "SELECT department.id, department.name FROM department;";
 
-	connection.query(createRole, function (err, res) {
+	db.query(createRole, function (err, res) {
 		if (err) throw err;
   console.table (res);
 	// 	// Select department for role
@@ -346,7 +347,7 @@ function removeRole () {
 ;}
 
 // // View all deparments
-function viewAllDepartments() {
+function findAllDepartments() {
   const findAllDepartments =
   "SELECT department.id, department.name FROM department;"
  ;
@@ -411,7 +412,91 @@ function removeDepartment ()  {
   });
 };
 
+function addEmployee ()  {
+  inquirer.prompt([
+    {
+      type: 'input',
+      name: 'fistName',
+      message: "What is the employee's first name?",
+      validate: addFirst => {
+        if (addFirst) {
+            return true;
+        } else {
+            console.log('Please enter a first name');
+            return false;
+        }
+      }
+    },
+    {
+      type: 'input',
+      name: 'lastName',
+      message: "What is the employee's last name?",
+      validate: addLast => {
+        if (addLast) {
+            return true;
+        } else {
+            console.log('Please enter a last name');
+            return false;
+        }
+      }
+    }
+  ])
+    .then(answer => {
+    const params = [answer.fistName, answer.lastName]
 
+    const roleEmp = `SELECT role.id, role.title FROM role`;
+  
+    db.query(roleEmp, (err, data) => {
+      if (err) throw err; 
+      
+      const roles = data.map(({ id, title }) => ({ name: title, value: id }));
+
+      inquirer.prompt([
+            {
+              type: 'list',
+              name: 'role',
+              message: "Employee's role?",
+              choices: roles
+            }
+          ])
+            .then(roleChoice => {
+              const role = roleChoice.role;
+              params.push(role);
+
+              const man = `SELECT * FROM employee`;
+
+             db.query(man, (err, data) => {
+                if (err) throw err;
+
+                const managers = data.map(({ id, first_name, last_name }) => ({ name: first_name + " "+ last_name, value: id }));
+
+                inquirer.prompt([
+                  {
+                    type: 'list',
+                    name: 'manager',
+                    message: "Employee's manager?",
+                    choices: managers
+                  }
+                ])
+                  .then(managerChoice => {
+                    const manager = managerChoice.manager;
+                    params.push(manager);
+
+                    const emp = `INSERT INTO employee (first_name, last_name, role_id, manager_id)
+                    VALUES (?, ?, ?, ?)`;
+
+                    db.query(emp, params, (err, result) => {
+                    if (err) throw err;
+                    console.table(result)
+
+                    findAllEmployees();
+              });
+            });
+          });
+        });
+     });
+  });
+};
 
 
 // View department budget
@@ -423,7 +508,7 @@ function findDepartmentBudget () {
       if (err) throw err;
       console.table(response);
     })
-    .then(() => displayPrompts());
+    displayPrompts();
 }
 
 // update employee manager
@@ -458,7 +543,7 @@ function updateEmployeeManager () {
     const params = [answer.fistName, answer.lastName]
     const employeeRole = `SELECT role.id, role.title FROM role`;
   
-    db.promise().query(employeeRole, (err, data) => {
+    db.query(employeeRole, (err, data) => {
       if (err) throw err; 
       console.table(data)
       
